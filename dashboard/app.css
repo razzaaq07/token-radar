@@ -46,6 +46,31 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 .kpi .v.amber { color: var(--amber); }
 .kpi .s { font-size: 12px; color: var(--faint); margin-top: 1px; }
 
+/* Protocol accounting strip: every protocol in exactly one group */
+.accounting { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 0 0 22px; }
+.accounting .bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin: 8px 0 10px; }
+.accounting .bar i { display: block; height: 100%; }
+.accounting .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); }
+.accounting .legend b { color: var(--ink); }
+.accounting .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+/* Farm verdict badges */
+.verdict { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.verdict.worth { background: #123626; color: var(--green); border: 1px solid #1f5c40; }
+.verdict.marginal { background: var(--amber-soft); color: var(--amber); border: 1px solid #6b5316; }
+.verdict.skipv { background: #2a1a1a; color: #f26d6d; border: 1px solid #5c2a2a; }
+
+/* Evidence tables in the model section */
+.evidence { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 13.5px; }
+.evidence th, .evidence td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.evidence th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: var(--surface-2); }
+.evidence td.r, .evidence th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.evidence .kept { color: var(--green); font-weight: 700; }
+.evidence .dropped { color: var(--faint); }
+.evidence tr:last-child td { border-bottom: none; }
+.rangebox { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 10px 0 16px; font-size: 14px; color: var(--muted); }
+.rangebox b { color: var(--ink); }
+
 /* Tabs */
 .tabs { display: flex; gap: 6px; margin: 0 0 16px; }
 .tab {

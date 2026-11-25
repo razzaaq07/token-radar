@@ -103,16 +103,36 @@
 
   function headerHtml() {
     var top = rows[0];
+    var a = DATA.accounting || null;
+    var acct = '';
+    if (a) {
+      var segs = [
+        { n: a.ranked_watchlist, c: '#f0b429', label: 'Ranked · watchlist' },
+        { n: a.ranked_early, c: '#3ddc97', label: 'Ranked · early' },
+        { n: a.pre_token_excluded, c: '#6cb4ff', label: 'Pre-token · excluded as wrapped / staked / bridged' },
+        { n: a.live_priced_comp, c: '#b388ff', label: 'Token trades · priced comp' },
+        { n: a.live_not_comp, c: '#5f6d82', label: 'Token recorded · no usable cap / out' },
+      ];
+      var bar = segs.map(function (s) { return '<i style="width:' + (100 * s.n / a.total).toFixed(1) + '%;background:' + s.c + '"></i>'; }).join('');
+      var legend = segs.map(function (s) {
+        return '<span><i class="sw" style="background:' + s.c + '"></i>' + s.label + ' <b>' + s.n + '</b></span>';
+      }).join('');
+      acct = '<div class="accounting"><div style="font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Protocol accounting — all ' + a.total + ' snapshot protocols in exactly one group</div>' +
+        '<div class="bar">' + bar + '</div><div class="legend">' + legend + '</div>' +
+        '<div style="font-size:12.5px;color:var(--faint);margin-top:8px">Excluded pre-token: CEX ' + a.excluded_cex + ' · wrapped category ' + a.excluded_wrapped_cat + ' · versioned ' + a.excluded_versioned + ' · wrapped word ' + a.excluded_wrapped_word + '. ' +
+        'Live-token not in the comps: CEX ' + a.live_not_comp_cex + ' · versioned ' + a.live_not_comp_versioned + ' · wrapped category ' + a.live_not_comp_wrapped_cat + ' · no usable cap ' + a.live_not_comp_no_cap + '.</div></div>';
+    }
     return '<h1>Token Radar<span class="dot">.</span></h1>' +
       '<p class="lede">Every protocol DefiLlama tracks that still <b>records no token</b>, ranked by what its launch would be worth. ' +
       'The implied value is fitted on the snapshot&#8217;s own live-token protocols, never asserted: <b>' + esc(DATA.model_version) + '</b>, ' +
       'snapshot of <b>' + esc(DATA.as_of) + '</b>, ' + DATA.board_size + ' protocols ranked, ' + DATA.watchlist_size + ' of them on the watchlist.</p>' +
+      acct +
       '<div class="kpis">' +
       '<div class="kpi"><div class="k">Board</div><div class="v">' + DATA.board_size + '</div><div class="s">ranked rows</div></div>' +
       '<div class="kpi"><div class="k">Watchlist</div><div class="v">' + DATA.watchlist_size + ' / ' + DATA.watchlist_size + '</div><div class="s">covered</div></div>' +
       '<div class="kpi"><div class="k">Total implied</div><div class="v amber">' + money(totalImplied()) + '</div><div class="s">across the board</div></div>' +
       '<div class="kpi"><div class="k">Top protocol</div><div class="v">' + (top ? esc(top.name) : '—') + '</div><div class="s">' + (top ? money(top.implied_value_usd) + ' implied' : '') + '</div></div>' +
-      '<div class="kpi"><div class="k">Comps fit R&#178;</div><div class="v">' + DATA.fit.r2.toFixed(2) + '</div><div class="s">' + DATA.fit.n + ' live-token comps</div></div>' +
+      '<div class="kpi"><div class="k">Worth farming</div><div class="v">' + (DATA.farm_summary ? DATA.farm_summary.worth_farming : '—') + ' / ' + DATA.board_size + '</div><div class="s">after gas and time</div></div>' +
       '<div class="kpi"><div class="k">Odds Brier</div><div class="v">' + DATA.odds.brier.toFixed(3) + '</div><div class="s">base rate ' + DATA.odds.base_brier.toFixed(3) + '</div></div>' +
       '</div>';
   }
@@ -161,9 +181,15 @@
     h += '<p class="count">Showing <b>' + list.length + '</b> of ' + rows.length + ' ranked protocols' +
       (state.watchOnly ? ' on the watchlist' : '') + '. Click a row for its detail view and farm plan.</p>';
     if (list.length === 0) return h + '<div class="empty">No protocol matches these filters.</div>';
-    h += '<table><thead><tr><th>#</th><th>Protocol</th><th>Category</th><th class="r">TVL</th><th class="r">7d</th><th class="r">Age</th><th class="r">Launch odds</th><th class="r">Implied value</th></tr></thead><tbody>';
+    h += '<table><thead><tr><th>#</th><th>Protocol</th><th>Category</th><th class="r">TVL</th><th class="r">7d</th><th class="r">Age</th><th class="r">Launch odds</th><th class="r">Implied value</th><th class="r">Farm verdict</th></tr></thead><tbody>';
     list.forEach(function (r) {
       var chg = r.change_7d === null ? '<span class="num">—</span>' : '<span class="num ' + (r.change_7d >= 0 ? 'up' : 'down') + '">' + pct(r.change_7d) + '</span>';
+      var f = r.farm || null;
+      var verdict = '';
+      if (f) {
+        var cls = f.verdict === 'WORTH IT' ? 'worth' : f.verdict === 'MARGINAL' ? 'marginal' : 'skipv';
+        verdict = '<span class="verdict ' + cls + '">' + f.verdict + '</span><br><span class="num" style="font-size:12px;color:var(--muted)">net ' + (f.net_usd >= 0 ? '+' : '') + '$' + f.net_usd.toFixed(0) + ' · $' + f.net_per_hour_usd.toFixed(0) + '/h</span>';
+      }
       h += '<tr data-slug="' + esc(r.slug) + '">' +
         '<td><span class="rank' + (r.rank <= 3 ? ' top3' : '') + '">' + r.rank + '</span></td>' +
         '<td><span class="pname">' + esc(r.name) + '</span> <span class="pslug">' + esc(r.slug) + '</span>' +
@@ -174,6 +200,7 @@
         '<td class="r num">' + ageLabel(r.age_days) + '</td>' +
         '<td class="r"><span class="odds">' + Math.round(r.launch_odds * 100) + '%</span></td>' +
         '<td class="r num"><b>' + money(r.implied_value_usd) + '</b></td>' +
+        '<td class="r">' + verdict + '</td>' +
         '</tr>';
     });
     h += '</tbody></table>';
@@ -200,6 +227,18 @@
       '<div class="fact"><div class="k">7-day change</div><div class="v">' + pct(r.change_7d) + '</div></div>' +
       '<div class="fact"><div class="k">Age with no token</div><div class="v">' + ageLabel(r.age_days) + '</div></div>' +
       '</div>' +
+      (function () {
+        var f = r.farm;
+        if (!f) return '';
+        var cls = f.verdict === 'WORTH IT' ? 'worth' : f.verdict === 'MARGINAL' ? 'marginal' : 'skipv';
+        return '<h3>Is it worth farming? <span class="verdict ' + cls + '">' + f.verdict + '</span></h3>' +
+          '<div class="math">' +
+          '<div class="row"><span class="lbl">Expected gross — your capital&#8217;s share of the implied value, airdrop pool 10% &times; active-farmer points 25&times;</span><span class="v num">$' + f.gross_usd.toFixed(2) + '</span></div>' +
+          '<div class="row"><span class="lbl">Cost — 8 transactions at ' + esc(r.chains[0] || 'the main chain') + ' gas ($' + f.gas_usd.toFixed(2) + ') + 2 hours at $10/h ($' + f.time_usd.toFixed(2) + ')</span><span class="v num">$' + f.cost_usd.toFixed(2) + '</span></div>' +
+          '<div class="row total"><span>Net — gross minus cost (' + (f.net_usd >= 0 ? '+' : '') + '$' + f.net_usd.toFixed(2) + ', $' + f.net_per_hour_usd.toFixed(2) + ' per hour)</span><span class="v num">' + (f.net_usd >= 0 ? '+' : '') + '$' + f.net_usd.toFixed(2) + '</span></div>' +
+          '</div>' +
+          '<p style="color:var(--muted);font-size:13px;margin:0 0 18px">The scenario is stated, not hidden: the airdrop pool and the points multiplier are this entry&#8217;s own assumptions, and the verdict changes if they do. Only ' + (DATA.farm_summary ? DATA.farm_summary.worth_farming : '—') + ' of ' + DATA.board_size + ' rows clear their costs under this scenario.</p>';
+      })() +
       '<h3>How the implied value is built</h3>' +
       '<div class="math">' +
       '<div class="row"><span class="lbl">Fitted value — exp(' + DATA.fit.intercept + ' + ' + DATA.fit.slope + ' &times; ln(TVL)) off the comps curve</span><span class="v num">' + moneyFull(m.fitted_value_usd) + '</span></div>' +
@@ -238,20 +277,48 @@
     var cats = o.category_rates.slice().sort(function (a, b) { return b.rate - a.rate; }).slice(0, 8).map(function (c) {
       return '<div class="odds-cell"><div class="k">' + esc(c.category) + '</div><div class="v">' + Math.round(c.rate * 100) + '%</div><div class="s">' + c.n + ' protocols</div></div>';
     }).join('');
+    function termTable(terms, valLabel) {
+      var h = '<table class="evidence"><thead><tr><th>Term</th><th class="r">' + valLabel + ' (leave-one-out)</th><th class="r">' + valLabel + ' (walk-forward)</th><th>Verdict</th><th>Why</th></tr></thead><tbody>';
+      terms.forEach(function (t) {
+        h += '<tr><td>' + esc(t.term) + '</td><td class="r">' + t.loo.toFixed(3) + '</td><td class="r">' + t.walk_forward.toFixed(3) + '</td>' +
+          '<td class="' + (t.kept ? 'kept' : 'dropped') + '">' + (t.kept ? 'KEPT' : 'not kept') + '</td><td style="color:var(--muted)">' + esc(t.note) + '</td></tr>';
+      });
+      return h + '</tbody></table>';
+    }
+    var fitTerms = DATA.fit_terms ? termTable(DATA.fit_terms, 'median abs log error') : '';
+    var oddsTerms = DATA.odds_terms ? termTable(DATA.odds_terms, 'Brier score') : '';
+    var range = '';
+    if (DATA.range) {
+      var rg = DATA.range;
+      var mult = function (x) { return '×' + Math.exp(x).toFixed(2); };
+      range = '<div class="rangebox"><b>Is the printed range honest?</b> The fitted value&#8217;s P25–P75 range is ' + mult(rg.p25_log) + ' to ' + mult(rg.p75_log) + ' of the point value. ' +
+        'Leave-one-out, <b>' + rg.loo_inside + ' of ' + rg.loo_total + ' real market caps (' + Math.round(rg.loo_pct * 100) + '%)</b> fall inside it; walk-forward, <b>' + rg.wf_inside + ' of ' + rg.wf_total + ' (' + Math.round(rg.wf_pct * 100) + '%)</b>. ' +
+        'Honest is about one half — the range neither flatters nor hides the miss.</div>';
+    }
+    var farm = '';
+    if (DATA.farm_summary) {
+      var fs = DATA.farm_summary;
+      farm = '<p><b>Farm verdicts.</b> Every row is costed under one stated scenario: the airdrop pool is 10% of the implied value, an active farmer&#8217;s points are worth 25&times; a passive deposit of the same size, and the cost is 8 transactions at the main chain&#8217;s gas plus 2 hours at $10 an hour. ' +
+        '<b>' + fs.worth_farming + ' of ' + DATA.board_size + '</b> rows clear their costs (' + fs.worth_it + ' WORTH IT, ' + fs.marginal + ' MARGINAL, ' + fs.skip + ' SKIP). The rest are not worth farming under this scenario, and the board says so.</p>';
+    }
     return '<div class="model">' +
       '<h2>The model — ' + esc(DATA.model_version) + '</h2>' +
       '<p><b>Implied value = fitted &times; growth &times; maturity &times; launch odds.</b> Every term is computed from this snapshot&#8217;s own figures on every run. No protocol name is ever special-cased.</p>' +
       '<p><b>Fitted value.</b> A log-log comps curve fitted on the snapshot&#8217;s live-token protocols: <code>log(mcap) = ' + f.intercept + ' + ' + f.slope + ' &times; log(TVL)</code>. ' +
       'The pool is every protocol that already trades and is itself a protocol — exchanges and versioned pool fragments are out. ' +
       'R&#178; <b>' + f.r2.toFixed(3) + '</b> on <b>' + f.n + '</b> comps. Bigger protocols trade at lower multiples, so the curve values size sub-linearly.</p>' +
-      '<p><b>Validation.</b> Leave-one-out refits give a median absolute log error of <b>' + f.loo_median_abs_log_err.toFixed(3) + '</b> (mean ' + f.loo_mean_abs_log_err.toFixed(3) + '). ' +
-      'A time split — fit the older half of the cohort by listing date, test it on the newer half (' + f.split_n + ' protocols) — gives a median absolute log error of <b>' + f.split_median_abs_log_err.toFixed(3) + '</b>.</p>' +
-      '<p><b>Growth.</b> The seven-day TVL change, clamped to −60%…+120%. A rise counts half, a fall counts four-fifths: hot streaks matter, but a falling protocol is punished more than a rising one is rewarded.</p>' +
+      '<h3>Every value term, fitted and tested held-out twice</h3>' +
+      '<p>A term is kept only when it lowers the held-out miss in <b>both</b> tests: leave-one-out refits, and a walk-forward split that fits the older half by listing date and tests the newer half. One test is not enough — the control below flatters the first and fails the second.</p>' +
+      fitTerms + range +
+      '<p><b>Growth.</b> The seven-day TVL change, clamped to −60%…+120%. A rise counts half, a fall counts four-fifths: hot streaks matter, but a falling protocol is punished more than a rising one is rewarded. The term itself was tested and not kept in the curve — the fitted value is the curve alone — but growth still adjusts the implied value, because a protocol gaining TVL this week is worth more than one losing it.</p>' +
       '<p><b>Maturity.</b> How long the protocol has run with no token: 0.55 + 0.45 &times; (1 − e<sup>−age/730d</sup>). An unknown listing date counts as 365 days.</p>' +
-      '<p><b>Launch odds.</b> The mean of the protocol&#8217;s age bucket&#8217;s token rate and its category&#8217;s token rate, clamped to 5%…95%, over ' + o.n_cohort + ' dated protocols. ' +
-      'Leave-one-out Brier score <b>' + o.brier.toFixed(3) + '</b> against the base rate&#8217;s <b>' + o.base_brier.toFixed(3) + '</b>: the odds beat guessing the overall rate (' + Math.round(o.overall_rate * 100) + '%) for every protocol.</p>' +
+      '<p><b>Launch odds.</b> The mean of the protocol&#8217;s age bucket&#8217;s token rate and its category&#8217;s token rate read among protocols of the <b>same age band</b>, shrunk toward that band&#8217;s own rate when the cell is small, clamped to 5%…95%, over ' + o.n_cohort + ' dated protocols. ' +
+      'The age match matters: a young category must not drag an old protocol down. Leave-one-out Brier score <b>' + o.brier.toFixed(3) + '</b> against the base rate&#8217;s <b>' + o.base_brier.toFixed(3) + '</b>: the odds beat guessing the overall rate (' + Math.round(o.overall_rate * 100) + '%) for every protocol.</p>' +
+      '<h3>Every odds signal, scored leave-one-out</h3>' +
+      oddsTerms +
       '<h3>Token rate by age</h3><div class="odds-grid">' + buckets + '</div>' +
       '<h3>Token rate by category (largest first)</h3><div class="odds-grid">' + cats + '</div>' +
+      farm +
       '<p><b>What is excluded.</b> A protocol is rankable only if it records no token and is not a wrapped, staked or bridged product of one that trades: no Bridge, Canonical Bridge, Liquid Staking, Liquid Restaking, Restaked BTC or CEX category, no versioned pool name, no wrapped / staked / staking word, no exchange-prefixed name. ' +
       'That is why a staked-ETH product never tops this board: it is not a launch waiting to happen.</p>' +
       '<p><b>What this is not.</b> The snapshot carries no launch date and no airdrop flag, so the radar does not predict whether or when a token is issued. The implied value is this entry&#8217;s own claim about what a launch would be worth if the protocol&#8217;s record stayed as it is.</p>' +
